@@ -86,3 +86,30 @@ func TestZipFS(t *testing.T) {
 		}
 	}
 }
+
+func TestZipExtraHeaderField(t *testing.T) {
+	zrc, err := zip.OpenReader("testdata/t.zip")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer zrc.Close()
+	zfs := New(&zrc.Reader)
+	//a := &afero.Afero{Fs: zfs}
+	f, err := zfs.Open("/sub")
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir, err := f.Readdir(-1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, info := range dir {
+		i := info.Sys().(ZipExtraInfo)
+		if i.uid != 1000 {
+			t.Error("UID incorrect!")
+		}
+		if i.gid != 1000 {
+			t.Error("GID incorrect!")
+		}
+	}
+}
