@@ -1,4 +1,4 @@
-// Copyright © 2016 Steve Francia <spf@spf13.com>.
+// Copyright © 2018 Steve Francia <spf@spf13.com>.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -11,12 +11,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// +build aix darwin openbsd freebsd netbsd dragonfly
-
 package afero
 
 import (
-	"syscall"
+	"os"
 )
 
-const BADFD = syscall.EBADF
+// Lstater is an optional interface in Afero. It is only implemented by the
+// filesystems saying so.
+// It will call Lstat if the filesystem iself is, or it delegates to, the os filesystem.
+// Else it will call Stat.
+// In addtion to the FileInfo, it will return a boolean telling whether Lstat was called or not.
+type Lstater interface {
+	LstatIfPossible(name string) (os.FileInfo, bool, error)
+}

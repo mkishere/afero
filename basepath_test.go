@@ -68,8 +68,8 @@ func TestRealPath(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		_, err = bp.RealPath(anotherDir)
 
-		if err == nil {
-			t.Errorf("Expected error")
+		if err != os.ErrNotExist {
+			t.Errorf("Expected os.ErrNotExist")
 		}
 
 	} else {
@@ -96,10 +96,10 @@ func TestNestedBasePaths(t *testing.T) {
 		Dir1, Dir2, Dir3 string
 	}
 	dirSpecs := []dirSpec{
-		dirSpec{Dir1: "/", Dir2: "/", Dir3: "/"},
-		dirSpec{Dir1: "/", Dir2: "/path2", Dir3: "/"},
-		dirSpec{Dir1: "/path1/dir", Dir2: "/path2/dir/", Dir3: "/path3/dir"},
-		dirSpec{Dir1: "C:/path1", Dir2: "path2/dir", Dir3: "/path3/dir/"},
+		{Dir1: "/", Dir2: "/", Dir3: "/"},
+		{Dir1: "/", Dir2: "/path2", Dir3: "/"},
+		{Dir1: "/path1/dir", Dir2: "/path2/dir/", Dir3: "/path3/dir"},
+		{Dir1: "C:/path1", Dir2: "path2/dir", Dir3: "/path3/dir/"},
 	}
 
 	for _, ds := range dirSpecs {
@@ -113,9 +113,9 @@ func TestNestedBasePaths(t *testing.T) {
 			FileName string
 		}
 		specs := []spec{
-			spec{BaseFs: level3Fs, FileName: "f.txt"},
-			spec{BaseFs: level2Fs, FileName: "f.txt"},
-			spec{BaseFs: level1Fs, FileName: "f.txt"},
+			{BaseFs: level3Fs, FileName: "f.txt"},
+			{BaseFs: level2Fs, FileName: "f.txt"},
+			{BaseFs: level1Fs, FileName: "f.txt"},
 		}
 
 		for _, s := range specs {
@@ -138,5 +138,53 @@ func TestNestedBasePaths(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+func TestBasePathOpenFile(t *testing.T) {
+	baseFs := &MemMapFs{}
+	baseFs.MkdirAll("/base/path/tmp", 0777)
+	bp := NewBasePathFs(baseFs, "/base/path")
+	f, err := bp.OpenFile("/tmp/file.txt", os.O_CREATE, 0600)
+	if err != nil {
+		t.Fatalf("failed to open file: %v", err)
+	}
+	if filepath.Dir(f.Name()) != filepath.Clean("/tmp") {
+		t.Fatalf("realpath leaked: %s", f.Name())
+	}
+}
+
+func TestBasePathCreate(t *testing.T) {
+	baseFs := &MemMapFs{}
+	baseFs.MkdirAll("/base/path/tmp", 0777)
+	bp := NewBasePathFs(baseFs, "/base/path")
+	f, err := bp.Create("/tmp/file.txt")
+	if err != nil {
+		t.Fatalf("failed to create file: %v", err)
+	}
+	if filepath.Dir(f.Name()) != filepath.Clean("/tmp") {
+		t.Fatalf("realpath leaked: %s", f.Name())
+	}
+}
+
+func TestBasePathTempFile(t *testing.T) {
+	baseFs := &MemMapFs{}
+	baseFs.MkdirAll("/base/path/tmp", 0777)
+	bp := NewBasePathFs(baseFs, "/base/path")
+
+	tDir, err := TempDir(bp, "/tmp", "")
+	if err != nil {
+		t.Fatalf("Failed to TempDir: %v", err)
+	}
+	if filepath.Dir(tDir) != filepath.Clean("/tmp") {
+		t.Fatalf("Tempdir realpath leaked: %s", tDir)
+	}
+	tempFile, err := TempFile(bp, tDir, "")
+	if err != nil {
+		t.Fatalf("Failed to TempFile: %v", err)
+	}
+	defer tempFile.Close()
+	if expected, actual := tDir, filepath.Dir(tempFile.Name()); expected != actual {
+		t.Fatalf("TempFile realpath leaked: expected %s, got %s", expected, actual)
 	}
 }
